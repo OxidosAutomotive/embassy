@@ -53,6 +53,9 @@ js-sys = { version = "0.3", optional = true }
 # arch-avr dependencies
 avr-device = { version = "0.5.3", optional = true }
 
+# arch-tock dependencies
+libtock = { path = "../../libtock-rs", optional = true }
+
 [dev-dependencies]
 critical-section = { version = "1.1", features = ["std"] }
 
@@ -82,6 +85,8 @@ arch-riscv32 = ["_arch"]
 arch-wasm = ["_arch", "dep:wasm-bindgen", "dep:js-sys"]
 ## AVR
 arch-avr = ["_arch", "dep:portable-atomic", "dep:avr-device"]
+## Tock
+arch-tock = ["_arch", "dep:libtock"]
 
 #! ### Executor
 
