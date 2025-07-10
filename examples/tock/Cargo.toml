@@ -1,0 +1,14 @@
+[package]
+name = "tock"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+libtock = { git = "https://github.com/OxidosAutomotive/libtock-rs.git", branch = "embassy", features = ["embassy"] }
+embassy-executor = { git = "https://github.com/OxidosAutomotive/embassy.git", branch = "tock_support", features = ["executor-thread", "arch-tock"] }
+embassy-time = { git = "https://github.com/OxidosAutomotive/embassy.git", branch = "tock_support", features = ["dynamic-tick-rate"]}
+embassy-futures = { path = "../../../embassy/embassy-futures" }
+embedded-hal-async = { version = "1.0" }
+
+[build-dependencies]
+libtock_build_scripts = { git = "https://github.com/OxidosAutomotive/libtock-rs.git", branch = "embassy" }
