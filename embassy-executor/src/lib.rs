@@ -31,6 +31,7 @@ check_at_most_one!(
     "arch-std",
     "arch-wasm",
     "arch-spin",
+    "arch-tock",
 );
 
 #[cfg(feature = "_arch")]
@@ -41,6 +42,7 @@ check_at_most_one!(
 #[cfg_attr(feature = "arch-std", path = "arch/std.rs")]
 #[cfg_attr(feature = "arch-wasm", path = "arch/wasm.rs")]
 #[cfg_attr(feature = "arch-spin", path = "arch/spin.rs")]
+#[cfg_attr(feature = "arch-tock", path = "arch/tock.rs")]
 mod arch;
 
 #[cfg(feature = "_arch")]
