@@ -1,0 +1,9 @@
+[build]
+rustflags = [
+    "-C", "relocation-model=static",
+    "-C", "link-arg=-icf=all",
+]
+
+[env]
+LIBTOCK_LINKER_FLASH = "0x10040000"
+LIBTOCK_LINKER_RAM = "0x20014000"
