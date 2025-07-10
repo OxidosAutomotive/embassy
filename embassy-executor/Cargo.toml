@@ -107,6 +107,8 @@ js-sys = { version = "0.3", optional = true }
 # arch-avr dependencies
 avr-device = { version = "0.7.0", optional = true }
 
+# arch-tock dependencies
+libtock_platform = { git = "https://github.com/OxidosAutomotive/libtock-rs.git", branch = "embassy", optional = true }
 
 [dependencies.cordyceps]
 version = "0.3.4"
@@ -150,6 +152,8 @@ arch-wasm = ["_arch", "dep:wasm-bindgen", "dep:js-sys"]
 arch-avr = ["_arch", "dep:portable-atomic", "dep:avr-device"]
 ## spin (architecture agnostic; never sleeps)
 arch-spin = ["_arch"]
+## Tock
+arch-tock = ["_arch", "dep:libtock_platform", "portable-atomic/critical-section"]
 
 #! ### Metadata
 

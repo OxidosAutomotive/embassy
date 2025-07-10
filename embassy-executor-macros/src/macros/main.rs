@@ -8,9 +8,11 @@ use syn::{ReturnType, Type};
 
 use crate::util::*;
 
+#[derive(PartialEq)]
 enum Flavor {
     Standard,
     Wasm,
+    Tock,
 }
 
 pub(crate) struct Arch {
@@ -61,6 +63,12 @@ pub static ARCH_WASM: Arch = Arch {
     executor_required: false,
 };
 
+pub static ARCH_TOCK: Arch = Arch {
+    default_entry: None,
+    flavor: Flavor::Tock,
+    executor_required: false,
+};
+
 pub static ARCH_UNSPECIFIED: Arch = Arch {
     default_entry: None,
     flavor: Flavor::Standard,
@@ -73,6 +81,8 @@ struct Args {
     entry: Option<String>,
     #[darling(default)]
     executor: Option<String>,
+    #[darling(default)]
+    stack_size: Option<usize>,
 }
 
 pub fn run(args: TokenStream, item: TokenStream, arch: &Arch) -> TokenStream {
@@ -169,6 +179,7 @@ For example: `#[embassy_executor::main(entry = ..., executor = \"some_crate::Exe
 
     let f_body = f.body;
     let out = &f.sig.output;
+    let mut libtock_macros = TokenStream::new();
 
     let name_main_task = if cfg!(feature = "metadata-name") {
         quote!(
@@ -209,6 +220,108 @@ For example: `#[embassy_executor::main(entry = ..., executor = \"some_crate::Exe
                 Ok(())
             },
         ),
+        Flavor::Tock => {
+            libtock_macros = if let Some(stack_size) = args.stack_size {
+                quote! {
+                    libtock::runtime::set_main! {main}
+                    libtock::runtime::stack_size! {#stack_size}
+                }
+            } else {
+                error(
+                    &mut errors,
+                    &f.sig,
+                    "\
+No stack size specified for `tock` arch. Make sure you've specified a stack size, like so:
+`#[embassy_executor::main(stack_size = 3000)]`",
+                );
+                TokenStream::new()
+            };
+
+            (
+                quote!(Result<(), libtock::platform::ErrorCode>),
+                quote! {
+                    #[cfg(target_arch = "arm")]
+                    {
+                        unsafe fn __make_static<T>(t: &mut T) -> &'static mut T {
+                            ::core::mem::transmute(t)
+                        }
+
+                        use libtock::platform::{Syscalls, RawSyscalls};
+
+                        libtock::platform::share::scope::<
+                            (
+                                libtock::platform::Subscribe<libtock::runtime::TockSyscalls, { libtock::alarm::DRIVER_NUM }, { libtock::alarm::subscribe::CALLBACK }>,
+                                libtock::platform::Subscribe<libtock::runtime::TockSyscalls, { libtock::gpio::DRIVER_NUM }, { libtock::gpio::subscribe::CALLBACK }>,
+                                libtock::platform::Subscribe<
+                                    libtock::runtime::TockSyscalls,
+                                    { libtock::i2c_master::DRIVER_NUM },
+                                    { libtock::i2c_master::subscribe::MASTER_READ_WRITE },
+                                >,
+                                libtock::platform::Subscribe<libtock::runtime::TockSyscalls, { libtock::console::DRIVER_NUM }, { libtock::console::subscribe::READ }>,
+                                libtock::platform::Subscribe<libtock::runtime::TockSyscalls, { libtock::console::DRIVER_NUM }, { libtock::console::subscribe::WRITE }>,
+                            ),
+                            _,
+                            _,
+                        >(|handle| {
+                            let (alarm_handle, gpio_handle, i2c_handle, console_read_handle, console_write_handle) = handle.split();
+
+                            libtock::runtime::TockSyscalls::subscribe::<
+                                _,
+                                _,
+                                libtock::platform::DefaultConfig,
+                                { libtock::alarm::DRIVER_NUM },
+                                { libtock::alarm::subscribe::CALLBACK },
+                            >(alarm_handle, &libtock::alarm::EmbassyListener)
+                            .unwrap();
+
+                            libtock::runtime::TockSyscalls::subscribe::<
+                                _,
+                                _,
+                                libtock::platform::DefaultConfig,
+                                { libtock::gpio::DRIVER_NUM },
+                                { libtock::gpio::subscribe::CALLBACK },
+                            >(gpio_handle, &libtock::gpio::EmbassyListener)
+                            .unwrap();
+
+                            libtock::runtime::TockSyscalls::subscribe::<
+                                _,
+                                _,
+                                libtock::platform::DefaultConfig,
+                                { libtock::i2c_master::DRIVER_NUM },
+                                { libtock::i2c_master::subscribe::MASTER_READ_WRITE },
+                            >(i2c_handle, &libtock::i2c_master::EmbassyListener)
+                            .unwrap();
+
+                            libtock::runtime::TockSyscalls::subscribe::<
+                                libtock::platform::subscribe::OneId<{ libtock::console::DRIVER_NUM }, { libtock::console::subscribe::READ }>,
+                                _,
+                                libtock::platform::DefaultConfig,
+                                { libtock::console::DRIVER_NUM },
+                                { libtock::console::subscribe::READ },
+                            >(console_read_handle, &libtock::console::EmbassyListener)
+                            .unwrap();
+
+                            libtock::runtime::TockSyscalls::subscribe::<
+                                libtock::platform::subscribe::OneId<{ libtock::console::DRIVER_NUM }, { libtock::console::subscribe::WRITE }>,
+                                _,
+                                libtock::platform::DefaultConfig,
+                                { libtock::console::DRIVER_NUM },
+                                { libtock::console::subscribe::WRITE },
+                            >(console_write_handle, &libtock::console::EmbassyListener)
+                            .unwrap();
+
+                            libtock::alarm::init_async_driver();
+
+                            let mut executor: ::embassy_executor::Executor<libtock::runtime::TockSyscalls> = #executor::new();
+                            let executor = unsafe { __make_static(&mut executor) };
+                            executor.run(|spawner| {
+                                spawner.must_spawn(__embassy_main(spawner));
+                            })
+                        })
+                    }
+                },
+            )
+        },
     };
 
     let mut main_attrs = TokenStream::new();
@@ -227,6 +340,7 @@ For example: `#[embassy_executor::main(entry = ..., executor = \"some_crate::Exe
             #f_body
         }
 
+        #libtock_macros
         #entry
         #main_attrs
         fn main() -> #main_ret {
