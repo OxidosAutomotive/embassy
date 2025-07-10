@@ -321,6 +321,7 @@ pub const TICK_HZ: u64 = 2_621_440_000;
 #[cfg(feature = "tick-hz-5_242_880_000")]
 pub const TICK_HZ: u64 = 5_242_880_000;
 #[cfg(not(any(
+    feature = "dynamic-tick-rate",
     feature = "tick-hz-1",
     feature = "tick-hz-2",
     feature = "tick-hz-4",
