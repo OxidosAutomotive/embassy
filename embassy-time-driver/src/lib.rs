@@ -13,6 +13,8 @@
 //!
 //! If your driver supports a small number of set tick rates, expose your own cargo features and have each one
 //! enable the corresponding `embassy-time-driver/tick-*`.
+//! 
+//! If the frequency must be determined at runtime, you can enable the feature `dynamic-tick-rate`.
 //!
 //! Otherwise, don’t enable any `tick-hz-*` feature to let the user configure the tick rate themselves by
 //! enabling a feature on `embassy-time`.
@@ -112,6 +114,7 @@ mod tick;
 /// Ticks per second of the global timebase.
 ///
 /// This value is specified by the [`tick-*` Cargo features](crate#tick-rate)
+#[cfg(not(feature = "dynamic-tick-rate"))]
 pub const TICK_HZ: u64 = tick::TICK_HZ;
 
 /// Time driver
@@ -131,11 +134,17 @@ pub trait Driver: Send + Sync + 'static {
     /// Schedules a waker to be awoken at moment `at`.
     /// If this moment is in the past, the waker might be awoken immediately.
     fn schedule_wake(&self, at: u64, waker: &Waker);
+
+    /// Ticks per second of the global timebase.
+    #[cfg(feature = "dynamic-tick-rate")]
+    fn frequency() -> u64;
 }
 
 extern "Rust" {
     fn _embassy_time_now() -> u64;
     fn _embassy_time_schedule_wake(at: u64, waker: &Waker);
+    #[cfg(feature = "dynamic-tick-rate")]
+    fn _frequency() -> u64;
 }
 
 /// See [`Driver::now`]
@@ -150,9 +159,45 @@ pub fn schedule_wake(at: u64, waker: &Waker) {
     unsafe { _embassy_time_schedule_wake(at, waker) }
 }
 
+/// See [`Driver::frequency`]
+#[cfg(feature = "dynamic-tick-rate")]
+#[inline]
+pub fn frequency() -> u64 {
+    unsafe { _frequency() }
+}
+
 /// Set the time Driver implementation.
 ///
 /// See the module documentation for an example.
+#[cfg(feature = "dynamic-tick-rate")]
+macro_rules! time_driver_impl {
+    (static $name:ident: $t: ty = $val:expr) => {
+        static $name: $t = $val;
+
+        #[no_mangle]
+        #[inline]
+        fn _embassy_time_now() -> u64 {
+            <$t as $crate::Driver>::now(&$name)
+        }
+
+        #[no_mangle]
+        #[inline]
+        fn _embassy_time_schedule_wake(at: u64, waker: &core::task::Waker) {
+            <$t as $crate::Driver>::schedule_wake(&$name, at, waker);
+        }
+
+        #[no_mangle]
+        #[inline]
+        fn _frequency() -> u64 {
+            <$t as $crate::Driver>::frequency()
+        }
+    };
+}
+
+/// Set the time Driver implementation.
+///
+/// See the module documentation for an example.
+#[cfg(not(feature = "dynamic-tick-rate"))]
 #[macro_export]
 macro_rules! time_driver_impl {
     (static $name:ident: $t: ty = $val:expr) => {

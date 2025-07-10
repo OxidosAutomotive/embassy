@@ -12,7 +12,9 @@
 pub(crate) mod fmt;
 
 mod delay;
+#[cfg_attr(feature = "dynamic-tick-rate", path = "duration_dynamic.rs")]
 mod duration;
+#[cfg_attr(feature = "dynamic-tick-rate", path = "instant_dynamic.rs")]
 mod instant;
 mod timer;
 
@@ -29,7 +31,10 @@ mod driver_wasm;
 
 pub use delay::{block_for, Delay};
 pub use duration::Duration;
+#[cfg(not(feature = "dynamic-tick-rate"))]
 pub use embassy_time_driver::TICK_HZ;
+#[cfg(feature = "dynamic-tick-rate")]
+pub use embassy_time_driver::frequency;
 pub use instant::Instant;
 pub use timer::{with_deadline, with_timeout, Ticker, TimeoutError, Timer, WithTimeout};
 
@@ -41,9 +46,30 @@ const fn gcd(a: u64, b: u64) -> u64 {
     }
 }
 
+#[cfg(not(feature = "dynamic-tick-rate"))]
 pub(crate) const GCD_1K: u64 = gcd(TICK_HZ, 1_000);
+#[cfg(not(feature = "dynamic-tick-rate"))]
 pub(crate) const GCD_1M: u64 = gcd(TICK_HZ, 1_000_000);
+#[cfg(not(feature = "dynamic-tick-rate"))]
 pub(crate) const GCD_1G: u64 = gcd(TICK_HZ, 1_000_000_000);
+
+#[cfg(feature = "dynamic-tick-rate")]
+#[inline(always)]
+pub(crate) fn gcd_1k() -> u64 {
+    return gcd(frequency(), 1_000);
+}
+
+#[cfg(feature = "dynamic-tick-rate")]
+#[inline(always)]
+pub(crate) fn gcd_1m() -> u64 {
+    return gcd(frequency(), 1_000_000);
+}
+
+#[cfg(feature = "dynamic-tick-rate")]
+#[inline(always)]
+pub(crate) fn gcd_1g() -> u64 {
+    return gcd(frequency(), 1_000_000_000);
+}
 
 #[cfg(feature = "defmt-timestamp-uptime-s")]
 defmt::timestamp! {"{=u64}", Instant::now().as_secs() }
