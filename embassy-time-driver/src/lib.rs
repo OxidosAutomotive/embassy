@@ -170,6 +170,7 @@ pub fn frequency() -> u64 {
 ///
 /// See the module documentation for an example.
 #[cfg(feature = "dynamic-tick-rate")]
+#[macro_export]
 macro_rules! time_driver_impl {
     (static $name:ident: $t: ty = $val:expr) => {
         static $name: $t = $val;
