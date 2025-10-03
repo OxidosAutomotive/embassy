@@ -315,7 +315,7 @@ No stack size specified for `tock` arch. Make sure you've specified a stack size
                             let mut executor: ::embassy_executor::Executor<libtock::runtime::TockSyscalls> = #executor::new();
                             let executor = unsafe { __make_static(&mut executor) };
                             executor.run(|spawner| {
-                                spawner.must_spawn(__embassy_main(spawner));
+                                spawner.spawn(__embassy_main(spawner).unwrap());
                             })
                         })
                     }

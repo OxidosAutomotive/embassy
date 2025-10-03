@@ -15,7 +15,7 @@ mod run_queue;
     path = "state_atomics.rs"
 )]
 #[cfg_attr(
-    not(any(target_has_atomic = "8", target_has_atomic = "32")),
+    any(feature = "arch-tock", not(any(target_has_atomic = "8", target_has_atomic = "32"))),
     path = "state_critical_section.rs"
 )]
 mod state;
