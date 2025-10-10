@@ -5,10 +5,10 @@ use cordyceps::Linked;
 #[cfg(any(feature = "scheduler-priority", feature = "scheduler-deadline"))]
 use cordyceps::SortedList;
 
-#[cfg(target_has_atomic = "ptr")]
+#[cfg(all(target_has_atomic = "ptr", not(feature = "arch-tock")))]
 type TransferStack<T> = cordyceps::TransferStack<T>;
 
-#[cfg(not(target_has_atomic = "ptr"))]
+#[cfg(any(not(target_has_atomic = "ptr"), feature = "arch-tock"))]
 type TransferStack<T> = MutexTransferStack<T>;
 
 use super::{TaskHeader, TaskRef};
@@ -73,7 +73,7 @@ impl RunQueue {
     pub(crate) unsafe fn enqueue(&self, task: TaskRef, _tok: super::state::Token) -> bool {
         self.stack.push_was_empty(
             task,
-            #[cfg(not(target_has_atomic = "ptr"))]
+            #[cfg(any(not(target_has_atomic = "ptr"), feature = "arch-tock"))]
             _tok,
         )
     }
@@ -155,14 +155,14 @@ impl RunQueue {
 }
 
 /// atomic state does not require a cs...
-#[cfg(target_has_atomic = "ptr")]
+#[cfg(all(target_has_atomic = "ptr", not(feature = "arch-tock")))]
 #[inline(always)]
 fn run_dequeue(taskref: &TaskRef) {
     taskref.header().state.run_dequeue();
 }
 
 /// ...while non-atomic state does
-#[cfg(not(target_has_atomic = "ptr"))]
+#[cfg(any(not(target_has_atomic = "ptr"), feature = "arch-tock"))]
 #[inline(always)]
 fn run_dequeue(taskref: &TaskRef) {
     critical_section::with(|cs| {
@@ -171,12 +171,12 @@ fn run_dequeue(taskref: &TaskRef) {
 }
 
 /// A wrapper type that acts like TransferStack by wrapping a normal Stack in a CS mutex
-#[cfg(not(target_has_atomic = "ptr"))]
+#[cfg(any(not(target_has_atomic = "ptr"), feature = "arch-tock"))]
 struct MutexTransferStack<T: Linked<cordyceps::stack::Links<T>>> {
     inner: critical_section::Mutex<core::cell::UnsafeCell<cordyceps::Stack<T>>>,
 }
 
-#[cfg(not(target_has_atomic = "ptr"))]
+#[cfg(any(not(target_has_atomic = "ptr"), feature = "arch-tock"))]
 impl<T: Linked<cordyceps::stack::Links<T>>> MutexTransferStack<T> {
     const fn new() -> Self {
         Self {
